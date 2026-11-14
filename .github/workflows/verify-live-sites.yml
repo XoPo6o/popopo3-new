@@ -1,0 +1,51 @@
+name: Verify published salon websites
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-live-sites.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check published pages and green-site images
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_page() {
+            local url="$1"
+            local output="$2"
+            local code
+            code=$(curl -L --silent --show-error --max-time 45 -o "$output" -w "%{http_code}" "$url")
+            echo "HTTP $code  $url"
+            if [ "$code" != "200" ]; then
+              echo "FAIL: expected HTTP 200 for $url"
+              return 1
+            fi
+          }
+
+          check_page "https://xopo6o.github.io/" /tmp/account-root.html || true
+          check_page "https://xopo6o.github.io/popopo3.github.io/" /tmp/soviet.html
+          check_page "https://xopo6o.github.io/popopo3-new/" /tmp/green.html
+
+          echo "Checking image assets referenced by the green site..."
+          mapfile -t image_paths < <(grep -oE 'src="images/[^"]+"' /tmp/green.html | sed -E 's/^src="([^"]+)"$/\1/' | sort -u)
+          if [ "${#image_paths[@]}" -eq 0 ]; then
+            echo "FAIL: no local image references found"
+            exit 1
+          fi
+          for image_path in "${image_paths[@]}"; do
+            image_url="https://xopo6o.github.io/popopo3-new/${image_path}"
+            code=$(curl -L --silent --show-error --max-time 45 -o /dev/null -w "%{http_code}" "$image_url")
+            echo "HTTP $code  $image_url"
+            if [ "$code" != "200" ]; then
+              echo "FAIL: missing image $image_path"
+              exit 1
+            fi
+          done
+          echo "PASS: both project pages and all referenced green-site images returned HTTP 200."
