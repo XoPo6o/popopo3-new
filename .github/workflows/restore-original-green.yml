@@ -1,0 +1,36 @@
+name: Restore original green site with its own assets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/restore-original-green.yml"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target site repository
+        uses: actions/checkout@v4
+      - name: Checkout original source assets
+        uses: actions/checkout@v4
+        with:
+          repository: XoPo6o/popopo3.github.io
+          ref: main
+          path: source
+      - name: Restore original page and copy its images
+        run: |
+          mkdir -p images
+          cp -a source/images/. images/
+          cp source/New/index.html index.html
+          sed -i 's#../images/#images/#g' index.html
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html images/
+          git commit -m "Restore original green site with local image assets"
+          git push
